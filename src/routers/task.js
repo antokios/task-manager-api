@@ -1,9 +1,11 @@
 const express = require('express')
-const mongoose = require('mongoose')
+const sharp = require('sharp')
 const Task = require('../models/task')
 const auth = require('../middleware/auth')
+const upload = require('../middleware/upload')
 const router = new express.Router()
 
+// Create new Task
 router.post('/tasks', auth, async (req,res) => {
     const task = new Task({
         ...req.body,
@@ -18,6 +20,7 @@ router.post('/tasks', auth, async (req,res) => {
     }
 })
 
+// Read Task list
 router.get('/tasks', auth, async (req, res) => {
     const match = {}
     const sort = {}
@@ -47,6 +50,7 @@ router.get('/tasks', auth, async (req, res) => {
     }
 })
 
+// Read Task
 router.get('/tasks/:id', auth, async (req,res) => {
     const _id = req.params.id
 
@@ -62,6 +66,7 @@ router.get('/tasks/:id', auth, async (req,res) => {
     }
 })
 
+// Update Task
 router.patch('/tasks/:id', auth, async (req, res) => {
     const updates = Object.keys(req.body)
     const allowedUpdates = ['description', 'completed']
@@ -86,6 +91,7 @@ router.patch('/tasks/:id', auth, async (req, res) => {
     }
 })
 
+// Delete Task
 router.delete('/tasks/:id', auth, async (req, res) => {
     const task = await Task.findOneAndDelete({ _id: req.params.id, owner: req.user._id })
 
@@ -97,6 +103,49 @@ router.delete('/tasks/:id', auth, async (req, res) => {
         res.send(task)
     } catch (e) {
         res.status(500).send(e)
+    }
+})
+
+// Upload Task picture
+router.post('/tasks/:id/picture', auth, upload.single('picture'), async (req, res) => {
+    const _id = req.params.id
+    const task = await Task.findOne({ _id, owner: req.user._id });
+    try{
+        const buffer = await sharp(req.file.buffer).resize({ width: 250, height: 250 }).png().toBuffer()
+        task.picture = buffer
+        await task.save()
+        res.send()
+    } catch (e) {
+        res.status(500).send();
+    }
+}, (error, req, res, next) => {
+    res.status(400).send({error: error.message})
+})
+
+// Read Task picture
+router.get('/tasks/:id/picture', async (req, res) => {
+    try {
+        const task = await Task.findById(req.params.id)
+        if(!task || !task.picture){
+            throw new Error()
+        }
+        res.set('Content-Type', 'image/png')
+        res.send(task.picture)
+    } catch (e) {
+        res.status(500).send()
+    }
+})
+
+// Delete Task picture
+router.delete('/tasks/:id/picture', auth, async (req, res) => {
+    try{
+        const _id = req.params.id
+        const task = await Task.findOne({ _id, owner: req.user._id })
+        task.picture = undefined
+        await task.save()
+        res.send(task)
+    } catch (e){
+        res.status(500).send()
     }
 })
 

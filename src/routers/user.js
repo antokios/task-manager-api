@@ -1,11 +1,12 @@
 const express = require('express')
-const multer = require('multer')
 const sharp = require('sharp')
 const User = require('../models/user')
 const auth = require('../middleware/auth')
+const upload = require('../middleware/upload')
 const { sendWelcomeEmail, sendCancellationEmail } = require('../emails/account')
 const router = new express.Router()
 
+// Create new User
 router.post('/users', async (req,res) => {
     const user = new User(req.body)
 
@@ -19,6 +20,7 @@ router.post('/users', async (req,res) => {
     }
 })
 
+// Login User
 router.post('/users/login', async (req, res) => {
     try {
         const user = await User.findByCredentials(req.body.email, req.body.password)
@@ -29,6 +31,7 @@ router.post('/users/login', async (req, res) => {
     }
 })
 
+// Logout User
 router.post('/users/logout', auth, async (req, res) => {
     try {
         req.user.tokens = req.user.tokens.filter((token) => {
@@ -41,6 +44,7 @@ router.post('/users/logout', auth, async (req, res) => {
     }
 })
 
+// Logout user from all instances
 router.post('/users/logoutAll', auth, async (req, res) => {
     try {
         req.user.tokens = []
@@ -51,11 +55,12 @@ router.post('/users/logoutAll', auth, async (req, res) => {
     }
 })
 
-
+// Read User
 router.get('/users/me', auth, async (req, res) => {
     res.send(req.user)
 })
 
+// Update User
 router.patch('/users/me', auth, async (req, res) => {
     const updates = Object.keys(req.body)
     const allowedUpdates = ['name', 'email', 'password', 'age']
@@ -74,6 +79,7 @@ router.patch('/users/me', auth, async (req, res) => {
     }
 })
 
+// Delete User
 router.delete('/users/me', auth, async (req, res) => {
     try {
         await req.user.remove()
@@ -84,19 +90,7 @@ router.delete('/users/me', auth, async (req, res) => {
     }
 })
 
-const upload = multer({
-    limits: {
-        fileSize: 1000000
-    },
-    fileFilter(req, file, cb) {
-    if (!file.originalname.match(/\.(jpg|jpeg|png)$/)) {
-        return cb(new Error('Please upload an image'))
-    }
-
-    cb(undefined, true)
-}
-})
-
+// Upload User avatar
 router.post('/users/me/avatar', auth, upload.single('avatar'), async (req, res) => {
     req.user.avatar = await sharp(req.file.buffer).resize({ width: 250, height: 250 }).png().toBuffer()
     await req.user.save()
@@ -105,12 +99,14 @@ router.post('/users/me/avatar', auth, upload.single('avatar'), async (req, res) 
     res.status(400).send({ error: error.message })
 })
 
+// Delete User avatar
 router.delete('/users/me/avatar', auth, async (req, res) => {
     req.user.avatar = undefined
     await req.user.save()
     res.send()
 })
 
+// Read User avatar
 router.get('/users/:id/avatar', async (req, res) => {
     try {
         const user = await User.findById(req.params.id)
